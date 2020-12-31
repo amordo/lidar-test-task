@@ -4,79 +4,35 @@
 namespace plt = matplotlibcpp;
 using namespace helper;
 
-void Transformer::SaveChart(const string &path, bool normalized) {
-  // plt::clf();
-  // plt::figure_size(1200, 780);
+void Transformer::SaveChart(const string &path, vector<vector<double>> charts,
+                            bool normalized) {
+
   plt::figure();
-  static const map<string, string> settings = {{"linewidth", "0.5"}};
-  vector<double> x(data_parallel.size());
+  const map<string, string> settings = {{"linewidth", "0.5"}};
+  vector<double> x(charts.front().size());
+  for (int i = 0; i < x.size(); ++i)
+    x[i] = i;
+
   if (normalized) {
     double k_horiz = 12'000 * 1.0 / x.size();
-    for (int i = 0; i < x.size(); ++i)
-      x[i] = i * k_horiz;
+    for (auto &el : x)
+      el *= k_horiz;
 
-    // use data upped on min val
-    auto min_par = *min_element(data_parallel.begin(), data_parallel.end());
-    auto par_up = data_parallel;
-    if (min_par < 0)
-      for (auto &el : par_up)
-        el -= min_par;
-
-    auto min_per = *min_element(data_perpendic.begin(), data_perpendic.end());
-    auto per_up = data_perpendic;
-    if (min_per < 0)
-      for (auto &el : per_up)
-        el -= min_per;
-
-    plt::xlim(0, 12'000);
-    plt::ylim(0, (int)get_signal_max(par_up, per_up));
-
-    plt::plot(x, par_up, settings);
-    plt::plot(x, per_up, settings);
-  } else {
-    for (int i = 0; i < x.size(); ++i)
-      x[i] = i;
-    plt::xlim(0, (int)x.size());
-    plt::ylim((int)get_signal_min(data_parallel, data_perpendic),
-              (int)get_signal_max(data_parallel, data_perpendic));
-    plt::plot(x, data_parallel, settings);
-    plt::plot(x, data_perpendic, settings);
+    for (auto &chart : charts) {
+      auto min_el = min(*min_element(chart.begin(), chart.end()), 0.0);
+      for (auto &el : chart)
+        el -= min_el;
+    }
   }
 
-  plt::save(path);
-  plt::close();
-}
-
-void Transformer::SaveChartResult(const string &path, bool normalized) {
-  // plt::clf();
-  // plt::figure_size(1200, 780);
-  plt::figure();
-  static const map<string, string> settings = {{"linewidth", "0.5"}};
-  vector<double> x(result.size());
-  if (normalized) {
-    double k_horiz = 12'000 * 1.0 / x.size();
-    for (int i = 0; i < x.size(); ++i)
-      x[i] = i * k_horiz;
-
-    auto min_res = *min_element(result.begin(), result.end());
-    auto res_up = result;
-    if (min_res < 0)
-      for (auto &el : result)
-        el -= min_res;
-
-    plt::xlim(0, 12'000);
-    plt::ylim(0, (int)*max_element(res_up.begin(), res_up.end()));
-
-    plt::plot(x, res_up, settings);
-  } else {
-    for (int i = 0; i < x.size(); ++i)
-      x[i] = i;
-    plt::xlim(0, (int)x.size());
-    plt::ylim((int)*min_element(result.begin(), result.end()),
-              (int)*max_element(result.begin(), result.end()));
-    plt::plot(x, result, settings);
+  for (auto &chart : charts) {
+    plt::plot(x, chart, settings);
   }
 
+  plt::xlim(0, normalized ? 12'000 : (int)x.size());
+  plt::ylim(normalized ? 0 : (int)MinSig(charts), (int)MaxSig(charts));
+
+  // plt::legend();
   plt::save(path);
   plt::close();
 }
@@ -86,7 +42,21 @@ void Transformer::RemoveNoise() {
     data_parallel[i] -= noise_parallel[i];
   for (size_t i = 0; i < data_perpendic.size(); ++i)
     data_perpendic[i] -= noise_perpendic[i];
-  SaveChart(path.remove_noise);
+  // SaveChart(path.remove_noise);
+  SaveChart(path.remove_noise, {data_parallel, data_perpendic});
+}
+
+double Transformer::MinSig(const vector<vector<double>> &vv) {
+  auto res = vv.front().front();
+  for (auto &v : vv)
+    res = min(res, *min_element(v.begin(), v.end()));
+  return res;
+}
+double Transformer::MaxSig(const vector<vector<double>> &vv) {
+  auto res = vv.front().front();
+  for (auto &v : vv)
+    res = max(res, *max_element(v.begin(), v.end()));
+  return res;
 }
 
 void Transformer::RemoveZeroPath() {
@@ -99,7 +69,8 @@ void Transformer::RemoveZeroPath() {
   }
   data_parallel = {data_parallel.begin() + i, data_parallel.end()};
   data_perpendic = {data_perpendic.begin() + i, data_perpendic.end()};
-  SaveChart(path.remove_zero_path);
+  // SaveChart(path.remove_zero_path);
+  SaveChart(path.remove_zero_path, {data_parallel, data_perpendic});
 }
 
 void Transformer::Inverse() {
@@ -107,15 +78,20 @@ void Transformer::Inverse() {
     el = -el;
   for (auto &el : data_perpendic)
     el = -el;
-  SaveChart(path.inverse);
+  // SaveChart(path.inverse);
+  SaveChart(path.inverse, {data_parallel, data_perpendic});
 }
 
-void Transformer::Normalize() { SaveChart(path.normalize, true); }
+void Transformer::Normalize() {
+  // SaveChart(path.normalize, true);
+  SaveChart(path.normalize, {data_parallel, data_perpendic}, true);
+}
 
 void Transformer::Filter() {
   filter(data_parallel);
   filter(data_perpendic);
-  SaveChart(path.filter, true);
+  // SaveChart(path.filter, true);
+  SaveChart(path.filter, {data_parallel, data_perpendic}, true);
 }
 
 void Transformer::GetResult() {
@@ -125,5 +101,6 @@ void Transformer::GetResult() {
        ++it1, ++it2) {
     result.push_back(sqrt(*it1 * *it1) + sqrt(*it2 * *it2));
   }
-  SaveChartResult(path.result, true);
+  // SaveChartResult(path.result, true);
+  SaveChart(path.result, {result}, true);
 }

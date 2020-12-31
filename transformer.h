@@ -5,6 +5,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -24,16 +25,11 @@ private:
   vector<double> noise_perpendic;
   vector<double> result;
 
-  // TODO: merge these in one func
-  void SaveChart(const string &path, bool normalized = false);
-  void SaveChartResult(const string &path, bool normalized = false);
+  void SaveChart(const string &path, vector<vector<double>> charts,
+                 bool normalized = false);
 
-  void RemoveNoise();
-  void RemoveZeroPath();
-  void Inverse();
-  void Normalize();
-  void Filter();
-  void GetResult();
+  double MinSig(const vector<vector<double>> &vv);
+  double MaxSig(const vector<vector<double>> &vv);
 
 public:
   Transformer(const string &data_path, const string &noise_path)
@@ -41,7 +37,7 @@ public:
     helper::Parse(data_path, data_parallel, data_perpendic);
     helper::Parse(noise_path, noise_parallel, noise_perpendic);
 
-    SaveChart(path.init);
+    SaveChart(path.init, {data_parallel, data_perpendic});
 
     RemoveNoise();
     RemoveZeroPath();
@@ -50,4 +46,11 @@ public:
     Filter();
     GetResult();
   }
+
+  void RemoveNoise();
+  void RemoveZeroPath();
+  void Inverse();
+  void Normalize();
+  void Filter();
+  void GetResult();
 };
